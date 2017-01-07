@@ -8,7 +8,7 @@ import urllib.parse
 
 import requests
 
-from config import Strategy, config
+from .config import Strategy, config
 
 
 def auto_strategy(link, record):

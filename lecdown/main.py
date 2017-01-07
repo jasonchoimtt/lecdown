@@ -6,9 +6,9 @@ import urllib.parse
 
 from tabulate import tabulate
 
-from browser import open_driver, collect_links
-from config import Strategy, config, create_config, open_config
-from downloader import download_file, check_file
+from .browser import open_driver, collect_links
+from .config import Strategy, config, create_config, open_config
+from .downloader import download_file, check_file
 
 
 parser = argparse.ArgumentParser(description='Download lecture materials.')

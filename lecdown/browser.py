@@ -1,8 +1,9 @@
 from contextlib import contextmanager
 import urllib.parse
 
-from config import config
 from selenium import webdriver
+
+from .config import config
 
 
 @contextmanager

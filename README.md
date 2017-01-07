@@ -17,3 +17,6 @@ Future expansion
 ----------------
 
 1.  Download HTML pages as PDF
+
+Installation
+------------
