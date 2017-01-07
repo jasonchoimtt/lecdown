@@ -7,7 +7,7 @@ import urllib.parse
 from tabulate import tabulate
 
 from browser import open_driver, collect_links
-from config import config, create_config, open_config
+from config import Strategy, config, create_config, open_config
 from downloader import download_file, check_file
 
 
@@ -121,6 +121,24 @@ def main_mv(args):
         record = records[0]
         os.rename(args.source, args.target)
         record.local_path = args.target
+
+
+#######################################################################
+# rm
+#######################################################################
+parser_rm = create_mode('rm', help='Remove file')
+parser_rm.add_argument('--cached', action='store_true')
+parser_rm.add_argument('target')
+
+def main_rm(args):
+    with open_config():
+        records = [r for r in config['records'].values() if r.local_path == args.target]
+        assert len(records) == 1, 'Found more than 1 records for the file'
+        record = records[0]
+        if not args.cached:
+            os.unlink(args.target)
+        record.strategy = Strategy.IGNORE
+        record.local_path = None
 
 
 #######################################################################
