@@ -1,4 +1,5 @@
 import argparse
+import cgi
 from collections import defaultdict, OrderedDict
 from contextlib import contextmanager
 import datetime
@@ -54,10 +55,7 @@ config = OrderedDict([
     ('cookies', [])])
 
 
-def generate_local_path(link, record):
-    path = urllib.parse.urlparse(link).path
-    filename = os.path.basename(path)
-    filename = urllib.parse.unquote(filename)
+def generate_local_path(filename, record):
     if not filename:
         filename = 'download'
     if '.' not in filename:
@@ -78,13 +76,11 @@ def generate_local_path(link, record):
 @contextmanager
 def open_driver():
     driver = webdriver.Chrome()
-    for cookie in config['cookies']:
-        driver.add_cookie(cookie)
 
-    yield driver
-
-    config['cookies'] = driver.get_cookies()
-    driver.close()
+    try:
+        yield driver
+    finally:
+        driver.quit()
 
 
 def collect_links(urls):
@@ -93,6 +89,16 @@ def collect_links(urls):
 
         for dest_url in urls:
             print('navigating to {}'.format(dest_url))
+
+            parsed = urllib.parse.urlparse(dest_url)
+            cookies = [c for c in config['cookies'] if parsed.netloc.endswith(c['domain'])]
+            if cookies:
+                # Selenium dictates that we have to go to that domain to set a
+                # cookie
+                driver.get('{0.scheme}://{0.netloc}/favicon.ico'.format(parsed))
+                for cookie in cookies:
+                    driver.add_cookie(cookie)
+
             driver.get(dest_url)
 
             url = driver.current_url.partition('#')[0]
@@ -100,10 +106,11 @@ def collect_links(urls):
             a_tags = driver.find_elements_by_tag_name('a')
             for a in a_tags:
                 link = a.get_attribute('href')
-                # Selenium resolves the link, so it is definitely absolute
                 if not link:
                     continue
-                if link.partition('#')[0] == url:  # same page
+                link = link.partition('#')[0]
+                # Selenium resolves the link, so it is absolutely absolute
+                if link == url or link in urls:  # source page
                     continue
                 if not link.startswith('http://') and not link.startswith('https://'):
                     continue
@@ -164,7 +171,18 @@ def process_link(link):
             return 0, 1
 
         if not record.local_path:
-            record.local_path = generate_local_path(link, record)
+            filename = None
+            if 'Content-Disposition' in resp.headers:
+                _, params = resp.headers.get('Content-Disposition')
+                if 'filename' in params:
+                    filename = params['filename']
+
+            if not filename:
+                path = urllib.parse.urlparse(resp.url).path
+                filename = os.path.basename(path)
+                filename = urllib.parse.unquote(filename)
+
+            record.local_path = generate_local_path(filename, record)
 
         target = record.local_path
         if os.path.exists(target):
@@ -202,6 +220,8 @@ def cleanup_filename(filename):
     filename = re.sub(r'(?i)\b(tutorial|tut|t)\s?\b', 'T', filename)
     filename = re.sub(r'(?i)\b(assignment|assgn|asgn|assg|ass)\s?\b', 'HW', filename)
     filename = filename.replace('-', '')
+    if filename.endswith('.pdf'):
+        filename = filename[0].upper() + filename[1:]
     return filename
 
 
@@ -284,12 +304,20 @@ def main():
 
     elif args.mode == 'browser':
         with open_config():
-            with open_driver():
-                print('Press any key to quit...')
+            with open_driver() as driver:
                 try:
-                    input()
+                    while True:
+                        print('[S]ave cookie / [Q]uit > ', end='')
+                        l = input().lower()
+                        if l == 'q':
+                            break
+                        elif l == 's':
+                            cookies = driver.get_cookies()
+                            print('saved {} cookies.'.format(len(cookies)))
+                            config['cookies'].extend(cookies)
                 except KeyboardInterrupt:
                     pass
+
     elif args.mode == 'ls':
         with open_config():
             files = []
@@ -338,6 +366,7 @@ def main():
             record = records[0]
             os.rename(args.source, args.target)
             record.local_path = args.target
+
     else:
         with open_config():
             main_download()
