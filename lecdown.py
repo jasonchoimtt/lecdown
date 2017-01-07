@@ -232,6 +232,10 @@ def create_mode(mode, *args, **kwargs):
     return parser
 
 create_mode('init', help='Create config file')
+
+parser_add_source = create_mode('add-source', help='Add source page')
+parser_add_source.add_argument('source')
+
 create_mode('browser', help='Show interactive browser')
 
 parser_ls = create_mode('ls', help='List downloaded files')
@@ -267,6 +271,17 @@ def main():
     if args.mode == 'init':
         with open(CONFIG_FILE, 'x') as f:
             json.dump(config, f, indent=4)
+
+    elif args.mode == 'add-source':
+        with open_config():
+            source = args.source
+            scheme = urllib.parse.urlparse(source).scheme
+            if scheme == '':
+                source = 'http://' + source
+            elif scheme not in ['http', 'https']:
+                print('Unsupported scheme: {}'.format(scheme))
+            config['sources'].append(source)
+
     elif args.mode == 'browser':
         with open_config():
             with open_driver():
