@@ -1,5 +1,6 @@
 import cgi
 import hashlib
+from itertools import count
 import mimetypes
 import os.path
 import re
@@ -46,10 +47,27 @@ def cleanup_filename(filename):
     return filename
 
 
-def download_file(link):
-    record = config['records'][link]
+def file_digest(fname):
+    hasher = hashlib.sha1()
+    with open(fname, 'rb') as f:
+        hasher = hashlib.sha1()
+        for block in iter(lambda: f.read(4096), b''):
+            hasher.update(block)
+    return hasher.hexdigest()
+
+
+def download_file(link, verbose=False):
+    records = config['records']
+    record = records[link]
     if record.strategy == Strategy.IGNORE:
         return 0, 0
+
+    def show_record():
+        print('{:<4}{:<8}{:<20}{}'.format(
+            record.last_status or '',
+            record.strategy.upper(),
+            record.content_type or '',
+            urllib.parse.unquote(link)))
 
     # We ignore cache-control policy, and only use the ETag header to
     # validate with server.
@@ -63,10 +81,10 @@ def download_file(link):
         # Record status and skip
         record.last_status = resp.status_code
         if record.last_status != 404:
-            print('{0.last_status} ({0.strategy}) {0.content_type} {1}'.format(record, link))
+            show_record()
         return 0, 1
     else:
-        record.content_type = resp.headers.get('Content-Type')
+        record.content_type = resp.headers.get('Content-Type') or record.content_type
         record.etag = resp.headers.get('ETag')
         record.last_status = resp.status_code
 
@@ -76,7 +94,8 @@ def download_file(link):
             strategy = auto_strategy(link, record)
             record.strategy = strategy
 
-        print('{0.last_status} ({0.strategy}) {0.content_type} {1}'.format(record, link))
+        if resp.status_code != 304 or verbose:
+            show_record()
 
         if record.strategy == Strategy.IGNORE:  # AUTO -> IGNORE
             return 0, 1
@@ -95,22 +114,40 @@ def download_file(link):
                 filename = os.path.basename(path)
                 filename = urllib.parse.unquote(filename)
 
-            record.local_path = generate_local_path(filename, record)
+            # Generate a unique target filename for this URL
+            target = generate_local_path(filename, record)
+            if any(r.local_path == target for r in records.values() if r != record):
+                base, dot, ext = target.rpartition('.')
+                for serial in count(0):
+                    target = base + '.conflict.{}'.format(serial) + dot + ext
+                    if not any(r.local_path == target for r in records.values() if r != record):
+                        break
 
-        target = record.local_path
-        if os.path.exists(target):
-            base, dot, ext = target.rpartition('.')
-            target = base + '_updated' + dot + ext
+            record.local_path = target
+        else:
+            target = record.local_path
 
-        with open(target + '.download', 'xb') as f:
+        # Generate a unique temporary filename
+        for serial in count(0):
+            download = target + ('.{}.download'.format(serial) if serial > 0 else '.download')
+            if not os.path.exists(download):
+                break
+
+        with open(download, 'xb') as f:
             hasher = hashlib.sha1()
             for block in resp.iter_content(1024):
                 f.write(block)
                 hasher.update(block)
             record.sha = hasher.hexdigest()
 
-        os.rename(target + '.download', target)
-        print('-> {}'.format(target))
+        if os.path.exists(target):
+            sha = file_digest(target)
+            if sha != record.sha:
+                base, dot, ext = target.rpartition('.')
+                target = base + '_updated' + dot + ext
+
+        os.rename(download, target)
+        print(' -> {}'.format(target))
         record.updated_at = time.time()
         if not record.found_at:
             record.found_at = record.found_at
@@ -132,13 +169,7 @@ def check_file(link):
     else:
         # Check if the file has changed, using mtime then sha1sum
         if stat.st_mtime > record.updated_at:
-            hasher = hashlib.sha1()
-            with open(record.local_path, 'rb') as f:
-                hasher = hashlib.sha1()
-                for block in iter(lambda: f.read(4096), b''):
-                    hasher.update(block)
-            sha = hasher.hexdigest()
-
+            sha = file_digest(record.local_path)
             if sha != record.sha:
                 changed = True
 

@@ -144,7 +144,9 @@ def main_rm(args):
 #######################################################################
 # download
 #######################################################################
-create_mode('download', help='Download lecture materials')
+parser_download = create_mode('download', help='Download lecture materials')
+parser_download.add_argument('--verbose', '-v', action='store_true')
+parser.set_defaults(verbose=False)
 
 def main_download(args):
     with open_config():
@@ -153,7 +155,7 @@ def main_download(args):
         updated, checked = 0, 0
         for link in links:
             try:
-                u, c = download_file(link)
+                u, c = download_file(link, verbose=args.verbose)
                 updated += u
                 checked += c
             except Exception:
