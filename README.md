@@ -24,7 +24,7 @@ Installation
 Install this package:
 
 ```sh
-pip install git+https://github.com/jasonchoimtt/lecdown
+pip3 install git+https://github.com/jasonchoimtt/lecdown
 ```
 
 Install ChromeDriver:
@@ -34,6 +34,19 @@ Install ChromeDriver:
 brew install chromedriver
 # On Linux: I don't know...
 ```
+
+Development
+-----------
+
+You can clone this repository, and install lecdown in "editable" mode:
+
+```sh
+git clone https://github.com/jasonchoimtt/lecdown
+cd lecdown
+pip3 install -e .
+```
+
+Now running `lecdown` will use the version in the local repo.
 
 Usage
 -----
