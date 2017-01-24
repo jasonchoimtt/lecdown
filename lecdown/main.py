@@ -35,16 +35,20 @@ def main_init(args):
 #######################################################################
 parser_add_source = create_mode('add-source', help='Add source page')
 parser_add_source.add_argument('source')
+parser_add_source.add_argument('--destination', default='.')
 
 def main_add_source(args):
     with open_config():
         source = args.source
+        destination = os.path.abspath(args.destination)
+        if destination == '': destination = os.getcwd()
+
         scheme = urllib.parse.urlparse(source).scheme
         if scheme == '':
             source = 'http://' + source
         elif scheme not in ['http', 'https']:
             print('Unsupported scheme: {}'.format(scheme))
-        config['sources'].append(source)
+        config['sources'].append((source, destination))
 
 #######################################################################
 # browser
@@ -150,18 +154,21 @@ parser.set_defaults(verbose=False)
 
 def main_download(args):
     with open_config():
-        links = collect_links(config['sources'])
+        for job in config['sources']:
+            source = job[0]
+            dest_dir = job[1]
+            links = collect_links([source])
 
-        updated, checked = 0, 0
-        for link in links:
-            try:
-                u, c = download_file(link, verbose=args.verbose)
-                updated += u
-                checked += c
-            except Exception:
-                raise
+            updated, checked = 0, 0
+            for link in links:
+                try:
+                    u, c = download_file(link, verbose=args.verbose, dest_dir=dest_dir)
+                    updated += u
+                    checked += c
+                except Exception:
+                    raise
 
-        print('updated {}, checked {}'.format(updated, checked))
+            print('updated {}, checked {}'.format(updated, checked))
 
 
 def main():

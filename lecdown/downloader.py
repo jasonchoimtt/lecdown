@@ -56,7 +56,7 @@ def file_digest(fname):
     return hasher.hexdigest()
 
 
-def download_file(link, verbose=False):
+def download_file(link, verbose=False, dest_dir=''):
     records = config['records']
     record = records[link]
     if record.strategy == Strategy.IGNORE:
@@ -75,7 +75,14 @@ def download_file(link, verbose=False):
     if record.etag and os.path.exists(record.local_path):
         headers['If-None-Match'] = record.etag
         # If the file is missing, we should redownload that
-    resp = requests.get(link, headers=headers)
+    # cafile = '/usr/local/etc/openssl/cert.pem'
+    # cafile = 'cacert.pem'
+    # resp = requests.get(link, headers=headers, verify=cafile)
+    try:
+        resp = requests.get(link, headers=headers)
+    except Exception as e:
+        print("Exception: ", e, "link: ", link)
+        return 0, 1
 
     if not resp.ok:
         # Record status and skip
@@ -146,7 +153,8 @@ def download_file(link, verbose=False):
                 base, dot, ext = target.rpartition('.')
                 target = base + '_updated' + dot + ext
 
-        os.rename(download, target)
+        dest_filename = (dest_dir + '/' + target) if dest_dir != '' else target
+        os.rename(download, dest_filename)
         print(' -> {}'.format(target))
         record.updated_at = time.time()
         if not record.found_at:

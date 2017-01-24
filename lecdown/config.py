@@ -2,6 +2,7 @@ from collections import defaultdict, OrderedDict
 from contextlib import contextmanager
 import json
 import time
+import os
 
 
 class Strategy:
@@ -69,7 +70,8 @@ def open_config():
         json.dump(obj, f, indent=4)
 
 
-CONFIG_FILE = 'lecdown.json'
+HOME_PATH = os.path.expanduser("~")
+CONFIG_FILE = HOME_PATH + '/.lecdown.json'
 
 config = OrderedDict([
     ('sources', []),
