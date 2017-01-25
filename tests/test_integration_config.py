@@ -7,10 +7,6 @@ from lecdown.main import main
 def test_init(integration_env):
     main(['init'])
     assert os.path.exists(config.LOCAL_CONFIG_FILE)
-
-
-def test_init_global(integration_env):
-    main(['init', '--global'])
     assert os.path.exists(config.GLOBAL_CONFIG_FILE)
 
 

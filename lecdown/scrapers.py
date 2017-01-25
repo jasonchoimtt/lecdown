@@ -1,5 +1,6 @@
 from abc import ABCMeta
 import cgi
+import os.path
 import urllib.parse
 import requests
 import traceback
@@ -82,10 +83,15 @@ class SeleniumScraper:
         resp = requests.get(resource['url'], headers=headers)
 
         if not resp.ok:
-            return {
-                'status': Status.ERROR
-                # TODO
-                }
+            if resp.status_code == 404:
+                return {
+                    'status': Status.NOT_FOUND
+                    }
+            else:
+                return {
+                    'status': Status.ERROR,
+                    'description': 'HTTP Error {}'.format(resp.status_code)
+                    }
         else:
             # Detect filename from Content-Disposition
             filename = None
@@ -93,6 +99,12 @@ class SeleniumScraper:
                 _, params = cgi.parse_header(resp.headers.get('Content-Disposition'))
                 if 'filename' in params:
                     filename = params['filename']
+
+            if not filename:
+                # This is important when the request redirected us
+                path = urllib.parse.urlparse(resp.url).path.rstrip('/')
+                filename = os.path.basename(path)
+                filename = urllib.parse.unquote(filename) or None
 
             if resp.status_code != 304:
                 with open(save_to, 'xb') as f:

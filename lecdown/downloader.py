@@ -154,17 +154,17 @@ def download_with_scraper(scraper_name, sources, verbose=False):
         record = records.get(resource['url'])
         if not record:
             record = records[resource['url']] = Record()
-        orig_status = record.last_status
+        orig_strategy = record.strategy
 
         status, description = download_one(scraper, resource, record)
         results.append((status, description))
 
         if verbose or description or status in (Status.UPDATED, Status.ERROR) \
-                or orig_status == Status.NONE:
+                or orig_strategy == Strategy.AUTO:
             tags = ''
-            if orig_status == Status.NONE and status == Status.UPDATED:
+            if orig_strategy == Strategy.AUTO and status == Status.UPDATED:
                 tags += ' [NEW]'
-            elif orig_status == Status.NONE and status == Status.SKIPPED:
+            elif orig_strategy == Strategy.AUTO and status == Status.SKIPPED:
                 tags += ' [NEW, IGNORED]'
             filename = record.local_path or '[{}]'.format(record.filename or 'file')
             filename += tags

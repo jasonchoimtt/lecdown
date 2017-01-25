@@ -1,15 +1,19 @@
 import argparse
+from collections import OrderedDict
 import datetime
+import json
 import os
 import os.path
 import urllib.parse
 
 from tabulate import tabulate
+from xattr import xattr
 
 from .browser import open_driver
-from .config import Status, Strategy, config, create_config, open_config
+from .config import Record, Status, Strategy, config, config_write, create_config, \
+    get_default_local_config, open_config
 from .scrapers import DEFAULT_SCRAPER
-from .downloader import download_all, check_all
+from .downloader import download_all, check_all, XATTR_KEY_URL
 
 
 parser = argparse.ArgumentParser(description='Download lecture materials.')
@@ -173,6 +177,51 @@ def main_download(args):
             count[status] += 1
 
         print(', '.join('{} {}'.format(count[k], k) for k in KEYS))
+
+
+#######################################################################
+# download
+#######################################################################
+parser_migrate = create_mode('migrate')
+
+def main_migrate(args):
+    with open('lecdown.json') as f:
+        old = json.load(f, object_pairs_hook=OrderedDict)
+
+    new_config = get_default_local_config()
+
+    for source in old['sources']:
+        new_config['sources'].append({'source': source, 'scraper': DEFAULT_SCRAPER})
+
+    for url, record in old['records'].items():
+        last_status = Status.SKIPPED
+        if record['last_status'] == 404:
+            last_status = Status.NOT_FOUND
+        elif record['last_status'] == 304 and record['updated_at']:
+            last_status = Status.UP_TO_DATE
+        elif record['last_status'] == 200 and record['updated_at']:
+            last_status = Status.UPDATED
+        new_config['records'][url] = Record(
+            last_status=last_status,
+            discovered_at=record['discovered_at'],
+            updated_at=record['updated_at'],
+            filename=urllib.parse.unquote(url.rstrip('/').rpartition('/')[2]),
+            content_type=record['content_type'],
+            scraper_attrs={'etag': record['etag']},
+            sha=record['sha'],
+            local_path=record['local_path'],
+            local_modified=False,
+            strategy=record['strategy'])
+
+        if record['local_path'] and os.path.exists(record['local_path']):
+            xattr(record['local_path']).set(XATTR_KEY_URL, url.encode())
+            print('Wrote metadata for {}'.format(record['local_path']))
+
+    config_write('lecdown.new.json', new_config)
+    print()
+    print('Wrote lecdown.new.json')
+    print('Check the new config file and replace lecdown.json with it. '
+          'Make sure to do a backup!')
 
 
 def main(args=None):

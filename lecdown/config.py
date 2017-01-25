@@ -114,7 +114,7 @@ def get_default_global_config():
     return OrderedDict([
         ('renamers', []),
         ('depth', 0),
-        ('cookies', {})
+        ('cookies', [])
         ])
 
 
