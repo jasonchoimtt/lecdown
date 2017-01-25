@@ -6,9 +6,10 @@ import urllib.parse
 
 from tabulate import tabulate
 
-from .browser import open_driver, collect_links
-from .config import Strategy, config, create_config, open_config
-from .downloader import download_file, check_file
+from .browser import open_driver
+from .config import Status, Strategy, config, create_config, open_config
+from .scrapers import DEFAULT_SCRAPER
+from .downloader import download_all, check_all
 
 
 parser = argparse.ArgumentParser(description='Download lecture materials.')
@@ -24,7 +25,7 @@ def create_mode(mode, *args, **kwargs):
 #######################################################################
 # init
 #######################################################################
-create_mode('init', help='Create config file')
+parser_init = create_mode('init', help='Create config file')
 
 def main_init(args):
     create_config()
@@ -35,6 +36,7 @@ def main_init(args):
 #######################################################################
 parser_add_source = create_mode('add-source', help='Add source page')
 parser_add_source.add_argument('source')
+parser_add_source.add_argument('--scraper')
 
 def main_add_source(args):
     with open_config():
@@ -42,9 +44,11 @@ def main_add_source(args):
         scheme = urllib.parse.urlparse(source).scheme
         if scheme == '':
             source = 'http://' + source
-        elif scheme not in ['http', 'https']:
-            print('Unsupported scheme: {}'.format(scheme))
-        config['sources'].append(source)
+        scraper = args.scraper or DEFAULT_SCRAPER
+        config['sources'].append({
+            'source': source,
+            'scraper': scraper
+            })
 
 #######################################################################
 # browser
@@ -73,38 +77,47 @@ def main_browser(args):
 parser_ls = create_mode('ls', help='List downloaded files')
 parser_ls.add_argument('--all', '-a', action='store_true', help='List not downloaded files as well')
 
+def do_check_all():
+    table = [(old, '->', new or 'DELETED', url) for url, old, new in check_all()]
+    if table:
+        print(tabulate(table, tablefmt='plain'))
+
+
+def strftime(timestamp):
+    if timestamp:
+        return datetime.datetime.fromtimestamp(timestamp).strftime('%b %d %H:%M')
+    else:
+        return ''
+
+
 def main_ls(args):
     with open_config():
+        do_check_all()
         files = []
         afiles = []
         for link, record in config['records'].items():
             if record.local_path:  # Downloaded
                 filename = record.local_path
-                timestamp = datetime.datetime.fromtimestamp(record.updated_at) \
-                    .strftime('%b %d %H:%M')
+                timestamp = (
+                    strftime(record.updated_at) +
+                    ('*' if record.local_modified else ''))
                 strategy = record.strategy.upper()
-
-                exists, changed = check_file(link)
-                if not exists:
-                    timestamp += '?'
-                elif changed:
-                    timestamp += '*'
 
                 files.append((filename, timestamp, strategy, link))
-            elif args.all and record.checked_at:  # checked_at: File actually existed
-                content_type = '[{}]'.format(record.content_type.partition(';')[0])
-                timestamp = datetime.datetime.fromtimestamp(record.checked_at) \
-                    .strftime('%b %d %H:%M')
+            elif args.all and record.strategy != Strategy.AUTO:  # AUTO: file actually existed
+                content_type = '[{}]'.format((record.content_type or '?').partition(';')[0])
+                timestamp = strftime(record.updated_at)
                 strategy = record.strategy.upper()
 
-                afiles.append((-record.checked_at, (content_type, timestamp, strategy, link)))
+                afiles.append(
+                    (-(record.updated_at or 0), (content_type, timestamp, strategy, link)))
 
         files.sort()
         afiles.sort()
         afiles = [f[1] for f in afiles]
         files.extend(afiles)
 
-        print(tabulate(files, tablefmt='plain'))
+        print(tabulate(files, ['File', 'Updated at', 'Strategy', 'URL'], tablefmt='simple'))
 
 
 #######################################################################
@@ -150,22 +163,20 @@ parser.set_defaults(verbose=False)
 
 def main_download(args):
     with open_config():
-        links = collect_links(config['sources'])
+        do_check_all()
 
-        updated, checked = 0, 0
-        for link in links:
-            try:
-                u, c = download_file(link, verbose=args.verbose)
-                updated += u
-                checked += c
-            except Exception:
-                raise
+        KEYS = [Status.UPDATED, Status.UP_TO_DATE, Status.SKIPPED, Status.NOT_FOUND, Status.ERROR]
+        count = {k: 0 for k in KEYS}
 
-        print('updated {}, checked {}'.format(updated, checked))
+        results = download_all()
+        for status, _ in results:
+            count[status] += 1
+
+        print(', '.join('{} {}'.format(count[k], k) for k in KEYS))
 
 
-def main():
-    args = parser.parse_args()
+def main(args=None):
+    args = parser.parse_args(args=args)
     # Magical dispatching
     globals()['main_' + args.mode.replace('-', '_')](args)
 
