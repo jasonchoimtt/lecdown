@@ -12,6 +12,7 @@ from xattr import xattr
 from .config import Record, Status, Strategy, config
 
 
+# We use this extended file attribute to indicate the URL of a file
 XATTR_KEY_URL = 'user.lecdown.url'
 
 
@@ -71,6 +72,13 @@ def generate_filename(hint):
 
 
 def download_one(scraper, resource, record):
+    """
+    Download a single file for the given info.
+
+    This function decides the filename of the download and whether to replace a
+    given file. It relies on `local_modified` being correctly set by `check_all`
+    to process files correctly.
+    """
     if record.strategy == Strategy.IGNORE:
         return Status.SKIPPED, None
 
@@ -182,6 +190,9 @@ def download_with_scraper(scraper_name, sources, verbose=False):
 
 
 def download_all(verbose=False):
+    """
+    Classify sources by scrapers and invoke them.
+    """
     scrapers = {}
     for source in config['sources']:
         scrapers.setdefault(source['scraper'], []).append(source)

@@ -65,22 +65,13 @@ lecdown
 
 # List downloaded files
 lecdown ls
-
-# Move / Delete downloaded files
-lecdown mv weirdly_named_file.pdf lecture_notes.pdf
-lecdown rm useless_file.txt
 ```
 
 Lecdown works by storing an index in `lecdown.json`. Currently, it ignores any
 HTML links and downloads everything else. It does not scrape links of links
 either. It associates the downloaded files with the origin link in
-`lecdown.json`.
-
-You should make sure that you only use `lecdown mv` to rename files; otherwise
-`lecdown` will re-download the moved file.
-
-Similarly, if you want a file not to be redownloaded, you should use
-`lecdown rm` to do so.
+`lecdown.json`, and also uses extended file attributes (on Mac and Linux) to
+keep track of file moves.
 
 Cookie saving
 -------------

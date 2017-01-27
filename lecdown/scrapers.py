@@ -13,6 +13,10 @@ DEFAULT_SCRAPER = 'lecdown.scrapers.SeleniumScraper'
 
 
 class BaseScraper(metaclass=ABCMeta):
+    """
+    Implement this class and specify the "scraper" option in a source to create
+    custom behaviours on collecting and downloading links.
+    """
     def collect_resources(self, sources, cookies):
         """
         Collect resource links from the given sources.
