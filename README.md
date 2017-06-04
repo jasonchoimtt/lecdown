@@ -21,18 +21,19 @@ Future expansion
 Installation
 ------------
 
+Install requirements for xattr and ChromeDriver:
+
+```sh
+# On Mac: I forgot...
+brew install chromedriver # and something else I forgot...
+# On Fedora, etc.:
+sudo dnf install chromedriver python3-dev libffi-dev
+```
+
 Install this package:
 
 ```sh
 pip3 install git+https://github.com/jasonchoimtt/lecdown
-```
-
-Install ChromeDriver:
-
-```sh
-# On Mac:
-brew install chromedriver
-# On Linux: I don't know...
 ```
 
 Development
