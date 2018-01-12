@@ -3,9 +3,8 @@ import cgi
 import os.path
 import urllib.parse
 import requests
-import traceback
 
-from .config import Status
+from .config import config, Status
 from .browser import open_driver
 
 
@@ -58,9 +57,36 @@ class SeleniumScraper:
                     for cookie in cookies:
                         driver.add_cookie(cookie)
 
+                self.cookies = {c['name']: c['value'] for c in cookies}
+
                 driver.get(dest_url)
 
                 url = driver.current_url.partition('#')[0]
+                if url.startswith('https'):
+                    account = next(
+                        (a for a in config['accounts'] if url.startswith(a['url'])), None)
+                    if account:
+                        print('trying to login with account for {}'.format(account['url']))
+                        for name, value in account['form'].items():
+                            elems = driver.find_elements_by_name(name)
+                            if not elems:
+                                raise RuntimeError('Element with name "{}" not found'.format(name))
+                            for elem in elems:
+                                elem.send_keys(value)
+
+                        if 'form_id' in account:
+                            form = driver.find_element_by_id(account['form_id'])
+                        else:
+                            form = driver.find_element_by_tag_name('form')
+
+                        form.submit()
+
+                        # Some sites don't redirect properly
+                        driver.get(dest_url)
+                        url = driver.current_url.partition('#')[0]
+
+                        # Save cookie for downloading
+                        self.cookies.update({c['name']: c['value'] for c in driver.get_cookies()})
 
                 a_tags = driver.find_elements_by_tag_name('a')
                 for a in a_tags:
@@ -84,7 +110,7 @@ class SeleniumScraper:
         # validate with server.
         if scraper_attrs.get('etag') and not force:
             headers['If-None-Match'] = scraper_attrs['etag']
-        resp = requests.get(resource['url'], headers=headers)
+        resp = requests.get(resource['url'], headers=headers, cookies=self.cookies)
 
         if not resp.ok:
             if resp.status_code == 404:
