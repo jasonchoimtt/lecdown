@@ -17,19 +17,13 @@ from .downloader import download_all, check_all, XATTR_KEY_URL
 
 
 parser = argparse.ArgumentParser(description='Download lecture materials.')
-parser.set_defaults(mode='download')
-subparsers = parser.add_subparsers(title='subcommands')
-
-def create_mode(mode, *args, **kwargs):
-    parser = subparsers.add_parser(mode, *args, **kwargs)
-    parser.set_defaults(mode=mode)
-    return parser
+subparsers = parser.add_subparsers(dest='mode', title='subcommands')
 
 
 #######################################################################
 # init
 #######################################################################
-parser_init = create_mode('init', help='Create config file')
+parser_init = subparsers.add_parser('init', help='Create config file')
 
 def main_init(args):
     create_config()
@@ -38,7 +32,7 @@ def main_init(args):
 #######################################################################
 # add-source
 #######################################################################
-parser_add_source = create_mode('add-source', help='Add source page')
+parser_add_source = subparsers.add_parser('add-source', help='Add source page')
 parser_add_source.add_argument('source')
 parser_add_source.add_argument('--scraper')
 
@@ -57,7 +51,7 @@ def main_add_source(args):
 #######################################################################
 # browser
 #######################################################################
-create_mode('browser', help='Show interactive browser')
+subparsers.add_parser('browser', help='Show interactive browser')
 
 def main_browser(args):
     with open_config():
@@ -78,7 +72,7 @@ def main_browser(args):
 #######################################################################
 # ls
 #######################################################################
-parser_ls = create_mode('ls', help='List downloaded files')
+parser_ls = subparsers.add_parser('ls', help='List downloaded files')
 parser_ls.add_argument('--all', '-a', action='store_true', help='List not downloaded files as well')
 
 def do_check_all():
@@ -127,7 +121,7 @@ def main_ls(args):
 #######################################################################
 # mv
 #######################################################################
-parser_mv = create_mode('mv', help='Rename file')
+parser_mv = subparsers.add_parser('mv', help='Rename file')
 parser_mv.add_argument('source')
 parser_mv.add_argument('target')
 
@@ -143,7 +137,7 @@ def main_mv(args):
 #######################################################################
 # rm
 #######################################################################
-parser_rm = create_mode('rm', help='Remove file')
+parser_rm = subparsers.add_parser('rm', help='Remove file')
 parser_rm.add_argument('--cached', action='store_true')
 parser_rm.add_argument('target')
 
@@ -161,7 +155,7 @@ def main_rm(args):
 #######################################################################
 # download
 #######################################################################
-parser_download = create_mode('download', help='Download lecture materials')
+parser_download = subparsers.add_parser('download', help='Download lecture materials')
 parser_download.add_argument('--verbose', '-v', action='store_true')
 parser.set_defaults(verbose=False)
 
@@ -182,7 +176,7 @@ def main_download(args):
 #######################################################################
 # download
 #######################################################################
-parser_migrate = create_mode('migrate')
+parser_migrate = subparsers.add_parser('migrate')
 
 def main_migrate(args):
     with open('lecdown.json') as f:
@@ -226,6 +220,8 @@ def main_migrate(args):
 
 def main(args=None):
     args = parser.parse_args(args=args)
+    if not args.mode:
+        args.mode = 'download'
     # Magical dispatching
     globals()['main_' + args.mode.replace('-', '_')](args)
 
